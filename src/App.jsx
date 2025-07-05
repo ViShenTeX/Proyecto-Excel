@@ -13,6 +13,10 @@ function App() {
     max: 'N/A',
     min: 'N/A',
     average: 'N/A',
+    stdDev: 'N/A',
+    percentile25: 'N/A',
+    percentile50: 'N/A',
+    percentile75: 'N/A',
   });
 
   const clearFile = () => {
@@ -23,7 +27,32 @@ function App() {
       max: 'N/A',
       min: 'N/A',
       average: 'N/A',
+      stdDev: 'N/A',
+      percentile25: 'N/A',
+      percentile50: 'N/A',
+      percentile75: 'N/A',
     });
+  };
+
+  // Función para calcular la desviación estándar poblacional
+  const calculateStdDev = (data, mean) => {
+    const variance = data.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / data.length;
+    return Math.sqrt(variance);
+  };
+
+  // Función para calcular percentiles
+  const calculatePercentile = (data, percentile) => {
+    const sortedData = [...data].sort((a, b) => a - b);
+    const index = (percentile / 100) * (sortedData.length - 1);
+    const lowerIndex = Math.floor(index);
+    const upperIndex = Math.ceil(index);
+    
+    if (lowerIndex === upperIndex) {
+      return sortedData[lowerIndex];
+    }
+    
+    const weight = index - lowerIndex;
+    return sortedData[lowerIndex] * (1 - weight) + sortedData[upperIndex] * weight;
   };
 
   const processExcelFile = async (file) => {
@@ -33,46 +62,51 @@ function App() {
       setFileName(file.name);
 
       if (rows.length > 1) {
-        let numericColumnIndex = -1;
-        for (let i = 0; i < rows[0].length; i++) {
-          // Intentar identificar una columna numérica en la primera fila de datos (después del encabezado)
-          if (typeof rows[1][i] === 'number') {
-            numericColumnIndex = i;
-            break;
+        // Recolectar todos los valores numéricos de todas las columnas (excluyendo la primera columna que son los días)
+        let allNumericData = [];
+        
+        // Iterar por todas las columnas (empezando desde la segunda columna, índice 1)
+        for (let col = 1; col < rows[0].length; col++) {
+          // Iterar por todas las filas (excluyendo el encabezado)
+          for (let row = 1; row < rows.length; row++) {
+            const cellValue = rows[row][col];
+            if (typeof cellValue === 'number' && !isNaN(cellValue)) {
+              allNumericData.push(cellValue);
+            }
           }
         }
+        
+        if (allNumericData.length > 0) {
+          const count = allNumericData.length;
+          const max = Math.max(...allNumericData);
+          const min = Math.min(...allNumericData);
+          const sum = allNumericData.reduce((a, b) => a + b, 0);
+          const average = sum / count;
+          const stdDev = calculateStdDev(allNumericData, average);
+          const percentile25 = calculatePercentile(allNumericData, 25);
+          const percentile50 = calculatePercentile(allNumericData, 50);
+          const percentile75 = calculatePercentile(allNumericData, 75);
 
-        if (numericColumnIndex !== -1) {
-          const numericData = rows.slice(1).map(row => row[numericColumnIndex]).filter(item => typeof item === 'number');
-          
-          if (numericData.length > 0) {
-            const count = numericData.length;
-            const max = Math.max(...numericData);
-            const min = Math.min(...numericData);
-            const sum = numericData.reduce((a, b) => a + b, 0);
-            const average = sum / count;
-
-            setStats({
-              count: count,
-              max: max,
-              min: min,
-              average: average.toFixed(2),
-            });
-          } else {
-            setStats({
-              count: 0,
-              max: 'N/A',
-              min: 'N/A',
-              average: 'N/A',
-            });
-          }
-        } else {
-          // Si no se encuentra una columna numérica, al menos se cuenta el total de filas de datos.
           setStats({
-            count: rows.length - 1, // Excluir el encabezado
+            count: count,
+            max: max,
+            min: min,
+            average: average.toFixed(2),
+            stdDev: stdDev.toFixed(2),
+            percentile25: percentile25.toFixed(2),
+            percentile50: percentile50.toFixed(2),
+            percentile75: percentile75.toFixed(2),
+          });
+        } else {
+          setStats({
+            count: 0,
             max: 'N/A',
             min: 'N/A',
             average: 'N/A',
+            stdDev: 'N/A',
+            percentile25: 'N/A',
+            percentile50: 'N/A',
+            percentile75: 'N/A',
           });
         }
       } else {
